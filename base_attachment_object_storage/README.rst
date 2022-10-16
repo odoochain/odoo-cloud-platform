@@ -3,6 +3,8 @@ Base class for attachments on external object store
 
 This is a base addon that regroup common code used by addons targeting specific object store
 
+这是一个基本插件，用于重组针对特定对象存储的插件使用的通用代码
+
 Configuration
 -------------
 

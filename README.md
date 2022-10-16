@@ -4,6 +4,8 @@
 
 Camptocamp odoo addons used on our Cloud Platform.
 
+我们的云平台上使用的 Camptocamp odoo 插件
+
 ## Introduction
 
 On the platform we want to achieve having:
