@@ -17,6 +17,10 @@ They are generally < 50KB (default configuration) so they don't take
 that much space in database, but they'll be read much faster than from
 the object storage.
 
+对象存储可能很慢，因此，我们希望在数据库中存储一些文件。Odoo在列表看板视图中使用小图像（128256）。
+
+我们希望他们能快速阅读。它们通常小于50KB（默认配置），因此在数据库中不会占用太多空间，但读取速度会比从对象存储中快得多。
+
 The assets (application/javascript, text/css) are stored in database
 as well whatever their size is:
 
