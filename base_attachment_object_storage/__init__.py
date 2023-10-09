@@ -5,7 +5,6 @@ from odoo.http import Stream
 old_from_attachment = Stream.from_attachment
 
 
-@classmethod
 def from_attachment(cls, attachment):
     if attachment.store_fname and attachment._is_file_from_a_store(
         attachment.store_fname
