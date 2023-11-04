@@ -3,12 +3,25 @@
 
 import json
 import logging
-
+from odoo import http, tools
 from odoo.service import security
 from odoo.tools._vendor.sessions import SessionStore
 
 from . import json_encoding
 
+
+def is_redis_session_store_activated():
+    return tools.config.get('ODOO_SESSION_REDIS')
+
+
+# Check the existing of Redis library: https://pypi.org/project/redis/
+try:
+    import redis
+except ImportError:
+    if is_redis_session_store_activated():
+        raise ImportError(
+            'Please install package redis: '
+            'pip install redis')
 # this is equal to the duration of the session garbage collector in
 # odoo.http.session_gc()
 DEFAULT_SESSION_TIMEOUT = 60 * 60 * 24 * 7  # 7 days in seconds
@@ -27,7 +40,9 @@ class RedisSessionStore(SessionStore):
         prefix="",
         expiration=None,
         anon_expiration=None,
+        *args, **kwargs,
     ):
+        _logger.debug("Redis module is initialing ...")
         super().__init__(session_class=session_class)
         self.redis = redis
         if expiration is None:
@@ -108,7 +123,7 @@ class RedisSessionStore(SessionStore):
     def list(self):
         keys = self.redis.keys("%s*" % self.prefix)
         _logger.debug("a listing redis keys has been called")
-        return [key[len(self.prefix) :] for key in keys]
+        return [key[len(self.prefix):] for key in keys]
 
     def rotate(self, session, env):
         self.delete(session)
@@ -124,3 +139,16 @@ class RedisSessionStore(SessionStore):
         expiration.
         """
         return None
+
+    def _is_redis_server_running(self):
+        try:
+            self.redis.ping()
+            _logger.debug("Redis is running ...")
+        except redis.ConnectionError:
+            raise redis.ConnectionError('Redis server is not responding')
+
+
+if is_redis_session_store_activated():
+    # Patch methods of http to use Redis instead of filesystem
+    # http.Application.session_store = RedisSessionStore(session_class=http.Session)
+    pass
