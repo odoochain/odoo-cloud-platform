@@ -16,4 +16,5 @@
     "website": "https://github.com/camptocamp/odoo-cloud-platform",
     "data": [],
     "installable": True,
+    "excludes": ["beanus_redis_session",]
 }

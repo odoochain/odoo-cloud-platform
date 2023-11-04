@@ -3,6 +3,8 @@
 
 import json
 import logging
+import sys
+
 from odoo import http, tools
 from odoo.service import security
 from odoo.tools._vendor.sessions import SessionStore
@@ -21,14 +23,19 @@ except ImportError:
     if is_redis_session_store_activated():
         raise ImportError(
             'Please install package redis: '
-            'pip install redis')
+            'pip install redis if windows suggest also install memurai ')
 # this is equal to the duration of the session garbage collector in
 # odoo.http.session_gc()
 DEFAULT_SESSION_TIMEOUT = 60 * 60 * 24 * 7  # 7 days in seconds
 DEFAULT_SESSION_TIMEOUT_ANONYMOUS = 60 * 60 * 3  # 3 hours in seconds
 
 _logger = logging.getLogger(__name__)
+if sys.version_info > (3,):
+    import _pickle as cPickle
 
+    unicode = str
+else:
+    import cPickle
 
 class RedisSessionStore(SessionStore):
     """SessionStore that saves session to redis"""
@@ -58,7 +65,11 @@ class RedisSessionStore(SessionStore):
             self.prefix = "%s:%s:" % (self.prefix, prefix)
 
     def build_key(self, sid):
-        return "%s%s" % (self.prefix, sid)
+        key = self.prefix + sid
+        if isinstance(key, unicode):
+            key = key.encode('utf-8')
+        return key
+        # return "%s%s" % (self.prefix, sid)
 
     def save(self, session):
         key = self.build_key(session.sid)

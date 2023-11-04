@@ -27,7 +27,7 @@ When a prefix is defined, the keys are ``session:<prefix>:<session id>``
 
 This addon must be added in the server wide addons with (``--load`` option):
 
-``--load=web,session_redis``
+``--load=base,web,session_redis``
 
 Limitations
 -----------
@@ -39,3 +39,33 @@ Limitations
 * The addon monkey-patch ``odoo.http.Root.session_store`` with a custom
   method when the Redis mode is active, so incompatibilities with other addons
   is possible if they do the same.
+
+Usage
+-------------------------
+
+If windows suggest install memurai !
+
+To use Redis, install this module and please add "ODOO_SESSION_REDIS = True" option and add bean_redis_session as a wide module "server_wide_modules = base,web,bean_redis_session" in configuration file.
+
+Example setting in configuration file
+
+
+[options]
+
+odoo_session_redis = true
+odoo_session_redis_host      = localhost      # redis ip. default: locahost
+odoo_session_redis_port      = 6379           # redis port, default: 6379
+odoo_session_redis_dbindex   = 1              # redis database index, default: 1
+#odoo_session_redis_password     =                # redis password, default: none
+server_wide_modules = base,web,session_redis
+odoo_session_redis_prefix = t000
+#odoo_session_redis_url =
+#odoo_session_redis_expiration =
+#odoo_session_redis_expiration_anonymous =
+#odoo_session_redis_sentinel_host =
+#odoo_session_redis_sentinel_master_name =
+
+
+TODO
+-------------------------
+dev.md 防暴力
