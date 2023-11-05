@@ -5,7 +5,7 @@
 {
     "name": "Sessions in Redis",
     "summary": "Store web sessions in Redis",
-    "version": "16.0.1.0.1",
+    "version": "16.0.1.0.2",
     "author": "Camptocamp,Odoo Community Association (OCA)",
     "license": "AGPL-3",
     "category": "Extra Tools",
@@ -16,5 +16,8 @@
     "website": "https://github.com/camptocamp/odoo-cloud-platform",
     "data": [],
     "installable": True,
-    "excludes": ["beanus_redis_session",]
+    "excludes": ["beanus_redis_session",
+                 "muk_session_store",
+                 ],
+    "post_load": "_patch_system",
 }

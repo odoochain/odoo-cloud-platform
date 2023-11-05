@@ -3,10 +3,11 @@
 
 import logging
 import os
+import random
 import sys
 
-from odoo import http
-from odoo.tools import config
+from odoo import http, tools
+from odoo.addons.muk_utils.tools.patch import monkey_patch
 from odoo.tools.func import lazy_property
 
 from .session import RedisSessionStore
@@ -24,7 +25,7 @@ try:
     import redis
     from redis.sentinel import Sentinel
 except ImportError:
-    redis = None  # noqa
+    redis = False  # none or false
     _logger.debug("Cannot 'import redis'.")
 
 
@@ -32,21 +33,22 @@ def is_true(strval):
     return bool(strtobool(strval or "0".lower()))
 
 
-sentinel_host = config.get("ODOO_SESSION_REDIS_SENTINEL_HOST")
-sentinel_master_name = config.get("ODOO_SESSION_REDIS_SENTINEL_MASTER_NAME")
+sentinel_host = tools.config.get("ODOO_SESSION_REDIS_SENTINEL_HOST",False)
+sentinel_master_name = tools.config.get("ODOO_SESSION_REDIS_SENTINEL_MASTER_NAME")
 if sentinel_host and not sentinel_master_name:
     raise Exception(
         "odoo_session_redis_sentinel_master_name must be defined "
         "when using session_redis"
     )
-sentinel_port = int(config.get("ODOO_SESSION_REDIS_SENTINEL_PORT", 26379))
-host = config.get("ODOO_SESSION_REDIS_HOST", "localhost")
-port = int(config.get("ODOO_SESSION_REDIS_PORT", 6379))
-prefix = config.get("ODOO_SESSION_REDIS_PREFIX")
-url = config.get("ODOO_SESSION_REDIS_URL")
-password = config.get("ODOO_SESSION_REDIS_PASSWORD", None)
-expiration = config.get("ODOO_SESSION_REDIS_EXPIRATION")
-anon_expiration = config.get("ODOO_SESSION_REDIS_EXPIRATION_ANONYMOUS")
+sentinel_port = int(tools.config.get("ODOO_SESSION_REDIS_SENTINEL_PORT", 26379))
+host = tools.config.get("ODOO_SESSION_REDIS_HOST", "localhost")
+port = int(tools.config.get("ODOO_SESSION_REDIS_PORT", 6379))
+db = int(tools.config.get("ODOO_SESSION_REDIS_DBINDEX", 0)),
+prefix = tools.config.get("ODOO_SESSION_REDIS_PREFIX", "")
+url = tools.config.get("ODOO_SESSION_REDIS_URL", False)
+password = tools.config.get("ODOO_SESSION_REDIS_PASSWORD", None)
+expiration = tools.config.get("ODOO_SESSION_REDIS_EXPIRATION")
+anon_expiration = tools.config.get("ODOO_SESSION_REDIS_EXPIRATION_ANONYMOUS")
 
 
 @lazy_property
@@ -59,12 +61,23 @@ def session_store(self):
     else:
         redis_client = redis.Redis(host=host, port=port, password=password)
     return RedisSessionStore(
-        redis=redis_client,
+        myredis=redis_client,
         prefix=prefix,
         expiration=expiration,
         anon_expiration=anon_expiration,
         session_class=http.Session,
     )
+
+
+@monkey_patch(http)
+def session_gc(session_store):
+    if tools.config.get("session_store_database"):
+        if random.random() < 0.001:
+            session_store.clean()
+    elif tools.config.get("ODOO_SESSION_REDIS"):
+        pass
+    else:
+        session_gc.super(session_store)
 
 
 def purge_fs_sessions(path):
@@ -76,7 +89,7 @@ def purge_fs_sessions(path):
             _logger.warning("OS Error during purge of redis sessions.")
 
 
-if is_true(config.get("odoo_session_redis")):
+if is_true(tools.config.get("ODOO_SESSION_REDIS")):
     if sentinel_host:
         _logger.debug(
             "HTTP sessions stored in Redis with prefix '%s'. "
@@ -94,4 +107,4 @@ if is_true(config.get("odoo_session_redis")):
         )
     http.Application.session_store = session_store
     # clean the existing sessions on the file system
-    purge_fs_sessions(config.session_dir)
+    purge_fs_sessions(tools.config.session_dir)

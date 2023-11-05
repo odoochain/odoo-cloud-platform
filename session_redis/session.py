@@ -1,6 +1,6 @@
 # Copyright 2016-2019 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
-
+import functools
 import json
 import logging
 import sys
@@ -30,19 +30,28 @@ DEFAULT_SESSION_TIMEOUT = 60 * 60 * 24 * 7  # 7 days in seconds
 DEFAULT_SESSION_TIMEOUT_ANONYMOUS = 60 * 60 * 3  # 3 hours in seconds
 
 _logger = logging.getLogger(__name__)
-if sys.version_info > (3,):
-    import _pickle as cPickle
 
-    unicode = str
-else:
-    import cPickle
+
+def retry_redis(func):
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        for attempts in range(1, 6):
+            try:
+                return func(self, *args, **kwargs)
+            except redis.ConnectionError as error:
+                _logger.warning("SessionStore connection failed! (%s/5)" % attempts)
+                if attempts >= 5:
+                    raise error
+
+    return wrapper
+
 
 class RedisSessionStore(SessionStore):
     """SessionStore that saves session to redis"""
 
     def __init__(
         self,
-        redis,
+        myredis,
         session_class=None,
         prefix="",
         expiration=None,
@@ -51,7 +60,7 @@ class RedisSessionStore(SessionStore):
     ):
         _logger.debug("Redis module is initialing ...")
         super().__init__(session_class=session_class)
-        self.redis = redis
+        self.redis = myredis
         if expiration is None:
             self.expiration = DEFAULT_SESSION_TIMEOUT
         else:
@@ -64,15 +73,17 @@ class RedisSessionStore(SessionStore):
         if prefix:
             self.prefix = "%s:%s:" % (self.prefix, prefix)
 
-    def build_key(self, sid):
+    def _encode_session_key(self, sid):
         key = self.prefix + sid
-        if isinstance(key, unicode):
+        if isinstance(key, str):
             key = key.encode('utf-8')
         return key
-        # return "%s%s" % (self.prefix, sid)
+        # return key.encode("utf-8") if isinstance(key, str) else key  # created by muk_session_store
+        # return "%s%s" % (self.prefix, sid)  # created by session_redis
 
+    @retry_redis
     def save(self, session):
-        key = self.build_key(session.sid)
+        key = self._encode_session_key(session.sid)
 
         # allow to set a custom expiration for a session
         # such as a very short one for monitoring requests
@@ -98,11 +109,13 @@ class RedisSessionStore(SessionStore):
         if self.redis.set(key, data):
             return self.redis.expire(key, expiration)
 
+    @retry_redis
     def delete(self, session):
-        key = self.build_key(session.sid)
+        key = self._encode_session_key(session.sid)
         _logger.debug("deleting session with key %s", key)
         return self.redis.delete(key)
 
+    @retry_redis
     def get(self, sid):
         if not self.is_valid_key(sid):
             _logger.debug(
@@ -111,7 +124,7 @@ class RedisSessionStore(SessionStore):
             )
             return self.new()
 
-        key = self.build_key(sid)
+        key = self._encode_session_key(sid)
         saved = self.redis.get(key)
         if not saved:
             _logger.debug(
@@ -136,6 +149,7 @@ class RedisSessionStore(SessionStore):
         _logger.debug("a listing redis keys has been called")
         return [key[len(self.prefix):] for key in keys]
 
+    @retry_redis
     def rotate(self, session, env):
         self.delete(session)
         session.sid = self.generate_key()
@@ -158,13 +172,13 @@ class RedisSessionStore(SessionStore):
         except redis.ConnectionError:
             raise redis.ConnectionError('Redis server is not responding')
 
-    @classmethod
-    def instance(cls, *args, **kwargs):
-        if not hasattr(RedisSessionStore, "_instance"):
-            RedisSessionStore._instance = RedisSessionStore()
-        return RedisSessionStore._instance
+    # @classmethod
+    # def instance(cls, *args, **kwargs):
+    #     if not hasattr(RedisSessionStore, "_instance"):
+    #         RedisSessionStore._instance = RedisSessionStore()
+    #     return RedisSessionStore._instance
 
-if is_redis_session_store_activated():
-    # Patch methods of http to use Redis instead of filesystem
-    # http.Application.session_store = RedisSessionStore(session_class=http.Session)
-    pass
+# if is_redis_session_store_activated():
+# Patch methods of http to use Redis instead of filesystem
+# http.Application.session_store = RedisSessionStore(session_class=http.Session)
+# pass
