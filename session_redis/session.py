@@ -143,7 +143,7 @@ class RedisSessionStore(SessionStore):
             session.session_token = security.compute_session_token(session, env)
         self.save(session)
 
-    def vacuum(self):
+    def vacuum(self, max_lifetime=DEFAULT_SESSION_TIMEOUT):
         """Do not garbage collect the sessions
 
         Redis keys are automatically cleaned at the end of their
@@ -158,6 +158,11 @@ class RedisSessionStore(SessionStore):
         except redis.ConnectionError:
             raise redis.ConnectionError('Redis server is not responding')
 
+    @classmethod
+    def instance(cls, *args, **kwargs):
+        if not hasattr(RedisSessionStore, "_instance"):
+            RedisSessionStore._instance = RedisSessionStore()
+        return RedisSessionStore._instance
 
 if is_redis_session_store_activated():
     # Patch methods of http to use Redis instead of filesystem
