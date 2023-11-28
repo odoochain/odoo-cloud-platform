@@ -2,6 +2,7 @@
 import logging
 import contextlib
 import threading
+from configparser import ConfigParser
 
 from odoo.addons.muk_session_store.store.redis import RedisSessionStore
 
